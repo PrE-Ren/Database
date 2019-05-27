@@ -1,0 +1,562 @@
+options
+{
+  static = true;
+  DEBUG_PARSER = false;
+  IGNORE_CASE = true;
+}
+
+PARSER_BEGIN(MyNewGrammar)
+
+public class MyNewGrammar
+{
+  public static final int PRINT_SYNTAX_ERROR = 0;
+  public static final int PRINT_CREATE_TABLE = 1;
+  public static final int PRINT_DROP_TABLE = 2;
+  public static final int PRINT_DESC = 3;
+  public static final int PRINT_INSERT = 4;
+  public static final int PRINT_DELETE = 5;
+  public static final int PRINT_SELECT = 6;
+  public static final int PRINT_SHOW_TABLES = 7;
+  
+  public static void main(String args[]) throws ParseException
+  {
+    MyNewGrammar parser = new MyNewGrammar(System.in);
+    System.out.print("DB_2016-11464> ");
+
+    while (true)
+    {
+      try
+      {
+        parser.command();
+      }
+      catch (Exception e)
+      {
+        printMessage(PRINT_SYNTAX_ERROR);
+        MyNewGrammar.ReInit(System.in);
+      }
+    }  
+  }
+
+  public static void printMessage(int q)
+  {
+    switch(q)
+    {
+      case PRINT_SYNTAX_ERROR:
+      	System.out.println("Syntax error");
+      	break;
+      case PRINT_CREATE_TABLE:
+      	System.out.println("\'CREATE TABLE\' requested");
+      	break;
+      case PRINT_DROP_TABLE:
+      	System.out.println("\'DROP TABLE\' requested");
+      	break;
+      case PRINT_DESC:
+      	System.out.println("\'DESC\' requested");
+      	break;
+      case PRINT_INSERT:
+      	System.out.println("\'INSERT\' requested");
+      	break;
+      case PRINT_DELETE:
+      	System.out.println("\'DELETE\' requested");
+      	break;
+      case PRINT_SELECT:
+      	System.out.println("\'SELECT\' requested");
+      	break;
+      case PRINT_SHOW_TABLES:
+      	System.out.println("\'SHOW TABLES\' requested");
+      	break;
+    }
+    System.out.print("DB_2016-11464> ");
+  }
+}
+
+PARSER_END(MyNewGrammar)
+
+< DEFAULT, STATE1 > SKIP : {"\r" | "\t" | "\n" }
+
+< DEFAULT > SKIP : {" "}
+
+< DEFAULT, STATE1 > TOKEN : /* Keywords */
+{
+  < EXIT : "exit" >
+| < INT : "int" >
+| < CHAR : "char" >
+| < DATE : "date" >
+| < CREATE_TABLE : "create table" >
+| < NOT_NULL : "not null" >
+| < PRIMARY_KEY : "primary key" >
+| < FOREIGN_KEY : "foreign key" >
+| < REFERENCES : "references" >
+| < DROP_TABLE : "drop table" >
+| < DESC : "desc" >
+| < SHOW_TABLES : "show tables" >
+| < SELECT : "select" >
+| < ALL : "*" >
+| < AS : "as" >
+| < FROM : "from" >
+| < WHERE : "where" >
+| < OR : "or" >
+| < AND : "and" >
+| < IS : "is" >
+| < NOT : "not" >
+| < NULL : "null" >
+| < INSERT_INTO : "insert into" >
+| < VALUES : "values" >
+| < DELETE_FROM : "delete from" >
+}
+
+< DEFAULT, STATE1 > TOKEN :
+{
+  < SEMICOLON : ";" >
+| < LEFT_PAREN : "(" >
+| < RIGHT_PAREN : ")" >
+| < COMMA : "," >
+| < UNDERSCORE : "_" >
+| < INT_VALUE : (< SIGN >)? (< DIGIT >)+>
+| < SIGN : "+" | "-" >
+| < DIGIT : [ "0"-"9" ] >
+| < LEGAL_IDENTIFIER : < ALPHABET > (< ALPHABET > | < UNDERSCORE >)* >
+| < ALPHABET : [ "a"-"z", "A"-"Z" ] >
+| < PERIOD : "." >
+| < COMP_OP : "<" | ">" | "=" | ">=" | "<=" | "!=" >
+| < CHAR_STRING  : < QUOTE1 > (< NON_QUOTE_CHARACTER >)* < QUOTE2 >>
+| < DATE_VALUE  : < NNNN > "-" < NN > "-" < NN >>
+| < NNNN  : < DIGIT > < DIGIT > < DIGIT > < DIGIT >>
+| < NN : < DIGIT > < DIGIT >>
+}
+
+< STATE1 > TOKEN : {
+  < NON_QUOTE_CHARACTER : < DIGIT > | < ALPHABET > | < NON_QUOTE_SPECIAL_CHARACTERS > | < SPACE >>
+| < NON_QUOTE_SPECIAL_CHARACTERS : "!" | "#" | "%" | "&" | "@" | "`" | ":" | < SEMICOLON > | < SIGN > | < COMMA > | < LEFT_PAREN > | < RIGHT_PAREN > | < UNDERSCORE > | "*" | "/" | "~" | "{" | "}" | "^" | "[" | "]" | "|" | "/" | "\\" | "$" >
+| < SPACE : " " >
+| < QUOTE2 : "'" > : DEFAULT
+}
+
+< DEFAULT > TOKEN : {
+  < QUOTE1 : "'" > : STATE1
+}
+
+//1.QUERY
+//total command
+void command() :
+{}
+{
+  queryList()
+| (
+    < EXIT >
+    < SEMICOLON >
+    {
+      System.exit(0);
+    }
+  ) 
+}
+//list of queries
+void queryList() :
+{
+  int q;
+}
+{
+  (
+    q = query()
+    < SEMICOLON >
+    {
+      printMessage(q);
+    }
+  )+
+}
+//one query
+int query() :
+{
+  int q;
+}
+{
+(
+  //determine type of query(create table, drop table, desc... etc)
+  (
+    createTableQuery() 
+    {
+      q = PRINT_CREATE_TABLE;
+    }
+  )
+| (
+    dropTableQuery()
+    {
+      q = PRINT_DROP_TABLE;
+    }
+  )
+| (
+    descQuery()
+    {
+      q = PRINT_DESC;
+    }
+  )
+| (
+    selectQuery()
+    {
+      q = PRINT_SELECT;
+    }
+  )
+| (
+    insertQuery()
+    {
+      q = PRINT_INSERT;
+    }
+  )
+| (
+    deleteQuery()
+    {
+      q = PRINT_DELETE;
+    }
+  )
+| (
+    showTablesQuery()
+    {
+      q = PRINT_SHOW_TABLES;
+    }
+  )
+) 
+(
+  {
+    return q;
+  }
+)
+}
+
+//2.CREATE_TABLE
+
+void createTableQuery() : //create table contains name, element list
+{}
+{
+  < CREATE_TABLE >
+  tableName()
+  tableElementList()
+}
+
+void tableElementList() : //elements in element list
+{}
+{
+  < LEFT_PAREN >
+  tableElement()
+  (
+    < COMMA >
+    tableElement()
+  )*
+  < RIGHT_PAREN >
+}
+
+void tableElement() : //element is a column or some constraints
+{
+}
+{
+  columnDefinition()
+| tableConstraintDefinition()
+}
+
+void columnDefinition() : //column name, type, other(not null) 
+{}
+{
+  columnName()
+  dataType()
+  (
+    < NOT_NULL >
+  )?
+}
+
+void tableConstraintDefinition() : //primary key constraint or foreign key constraint
+{}
+{
+  primaryKeyConstraint()
+| referentialConstraint()
+}
+
+void primaryKeyConstraint() : //primary key's column name list
+{}
+{
+  < PRIMARY_KEY >
+  columnNameList()
+}
+
+void referentialConstraint() : //foreign key's column name list and referential table name and column name
+{}
+{
+  < FOREIGN_KEY >
+  columnNameList()
+  < REFERENCES >
+  tableName()
+  columnNameList()
+}
+
+void columnNameList() : //name list contains names
+{}
+{
+  < LEFT_PAREN >
+  columnName()
+  (
+    < COMMA >
+    columnName()
+  )*
+  < RIGHT_PAREN >
+}
+
+void dataType() : //a data type
+{}
+{
+  < INT >
+| (
+    < CHAR >
+    < LEFT_PAREN >
+    < INT_VALUE >
+    < RIGHT_PAREN >
+  )
+| < DATE >
+}
+
+void tableName() : //name of table
+{}
+{
+  < LEGAL_IDENTIFIER >
+}
+
+void columnName() : //name of column(attribute)
+{}
+{
+  < LEGAL_IDENTIFIER >
+}
+//3.DROP TABLE, DESC, SHOW TABLES
+void dropTableQuery() : //drop table + table name
+{}
+{
+  < DROP_TABLE >
+  tableName()
+}
+void descQuery() : //desc + table name
+{}
+{
+  < DESC >
+  tableName()
+}
+void showTablesQuery() : //show tables
+{}
+{
+  < SHOW_TABLES > 
+}
+//4.SELECT
+void selectQuery() : //select + select list(attributes) + expression(what record to select)
+{}
+{
+  < SELECT >
+  selectList()
+  tableExpression()
+}
+void selectList() : //columns(attributes) to select
+{}
+{
+  < ALL >
+| ( 
+    selectedColumn()
+    (
+      < COMMA >
+      selectedColumn()
+    )*
+  )
+}
+void selectedColumn() : //a column that is selected
+{}
+{
+  (
+    LOOKAHEAD(2) //lookahead 2 tokens to see if there is a PERIOD or not
+    (
+      tableName()
+      < PERIOD >
+      columnName()
+    )
+    | columnName()
+  )
+  (
+    < AS >
+    columnName()
+  )?
+}
+void tableExpression() : //from a(table list) where b(condition list)
+{}
+{
+  fromClause()
+  ( 
+    whereClause()
+  )?
+}
+void fromClause() : //table list
+{}
+{
+  < FROM >
+  tableReferenceList()
+}
+void tableReferenceList() : //list of tables
+{}
+{
+  referedTable()
+  (
+    < COMMA >
+    referedTable()
+  )*
+}
+void referedTable() : //table name(or table name as other table name)
+{}
+{
+  tableName()
+  (
+    < AS >
+    tableName()
+  )?
+}
+void whereClause() : //conditions to select
+{}
+{
+  < WHERE >
+  booleanValueExpression()
+}
+void booleanValueExpression() : //list of conditions 
+{}
+{
+  booleanTerm()
+  (
+    < OR >
+    booleanTerm()
+  )*
+}
+void booleanTerm() : //a condition contains one or many boolean factors
+{}
+{
+  booleanFactor()
+  (
+    < AND >
+    booleanFactor()
+  )*
+}
+void booleanFactor() : //a boolean value test or it's complement
+{}
+{
+  (
+    < NOT >
+  )?
+  booleanTest()
+}
+void booleanTest() : //predicate or parenthesized expression
+{}
+{
+  predicate()
+|
+  parenthesizedBooleanExpression()
+}
+void parenthesizedBooleanExpression() :
+{}
+{
+  < LEFT_PAREN >
+  booleanValueExpression()
+  < RIGHT_PAREN >
+}
+void predicate() : //comparison or null
+{}
+{
+  LOOKAHEAD(4) //need 4 tokens to find COMP_OP or NULL to determine which expression is right
+  comparisonPredicate()
+| 
+  nullPredicate()
+}
+void comparisonPredicate() : //compare two operands
+{}
+{
+  compOperand()
+  < COMP_OP >
+  compOperand()
+}
+void compOperand() : //comparable value and some names to compare
+{}
+{
+  comparableValue()
+| (
+    LOOKAHEAD(2) //lookahead to see if it has a PERIOD
+    (
+      tableName()
+      < PERIOD >
+      columnName()
+    )
+    | columnName()
+  )
+}
+void comparableValue() : //value that can compare
+{}
+{
+  < INT_VALUE >
+| 
+  < CHAR_STRING >
+|
+  < DATE_VALUE>
+}
+void nullPredicate() : //contains some name and null operations
+{}
+{
+  (
+    LOOKAHEAD(2) //same as before
+    (
+      tableName()
+      < PERIOD >
+      columnName()
+    )
+    | columnName()
+  )
+  nullOperation()
+}
+void nullOperation() : //is null or is not null
+{}
+{
+  < IS >
+  (
+    < NOT >
+  )?
+  < NULL >
+}
+//5.INSERT, DELETE
+void insertQuery(): //insert into a(table) b(columns and source)
+{}
+{
+  < INSERT_INTO >
+  tableName()
+  insertColumnsAndSource()
+}
+void insertColumnsAndSource(): //column name if needed + value list
+{}
+{
+  (
+    columnNameList()
+  )?
+  valueList()
+}
+void valueList(): //list of values
+{}
+{
+  < VALUES >
+  < LEFT_PAREN >
+  value()
+  (
+    < COMMA >
+    value()
+  )*
+  < RIGHT_PAREN >
+}
+void value(): //null or a comparable value
+{}
+{
+  < NULL >
+|
+  comparableValue()
+}
+void deleteQuery(): //delete from a(table) where b(if needed)
+{}
+{
+  < DELETE_FROM >
+  tableName() 
+  (
+    whereClause()
+  )?
+}
